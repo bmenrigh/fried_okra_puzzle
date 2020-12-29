@@ -67,6 +67,19 @@ func board_to_string(b *Board) string {
 }
 
 
+func transpose(b *Board) Board {
+	nb := copy_board(b)
+
+	for y := 0; y < BOARD_HEIGHT; y++ {
+		for x := 0; x < BOARD_WIDTH; x++ {
+			set_val(&nb, y, x, get_val(b, x, y))
+		}
+	}
+
+	return nb
+}
+
+
 func will_fit(b *Board, x int, y int, v uint8) bool {
 
 	if get_val(b, x, y) != 0 {
@@ -406,25 +419,25 @@ func rec_enum(solved *[]Board, b *Board, pc [4]int, o int) {
 
 func main() {
 
-	b := new_board()
+	//b := new_board()
 
 	// 90 moves
-	b.Grid = [16]uint8{2, 2, 2, 1, 1, 0, 0, 0, 1, 0, 0, 2, 1, 4, 0, 0}
+	//b.Grid = [16]uint8{2, 2, 2, 1, 1, 0, 0, 0, 1, 0, 0, 2, 1, 4, 0, 0}
 
 	//fmt.Printf("Board b:\n%s", board_to_string(&b))
 
-	pc := [4]int{11, 4, 0, 0}
-	var solved []Board
-	enumerate_solved(&solved, pc)
+	//pc := [4]int{11, 4, 0, 0}
+	//var solved []Board
+	// enumerate_solved(&solved, pc)
 
-	fmt.Printf("Found %d solved states.\n", len(solved))
+	// fmt.Printf("Found %d solved states.\n", len(solved))
 
-	states := make(map[Board]int)
+	// states := make(map[Board]int)
 
-	depth, found := 0, 0
-	explore_from_solved(&states, &solved, &found, &depth)
+	// depth, found := 0, 0
+	// explore_from_solved(&states, &solved, &found, &depth)
 
-	fmt.Printf("Found %d total states to a depth of %d.\n", found, depth)
+	// fmt.Printf("Found %d total states to a depth of %d.\n", found, depth)
 
 	// d := find_solution(&states, &b)
 
@@ -439,4 +452,56 @@ func main() {
 	// if err != nil {
 	// 	fmt.Printf(err.Error())
 	// }
+
+
+	for tpc := 1; tpc < 15; tpc++ {
+		for rc := 1; rc < 15; rc++ {
+			for gc := 0; gc < 15; gc++ {
+				for bc := 0; bc < 15; bc++ {
+
+					if bc == 1 {
+						continue
+					}
+
+					if rc + gc + bc != tpc {
+						continue
+					}
+
+					pc := [4]int{15 - tpc, rc, bc, gc}
+
+					var solved []Board
+					enumerate_solved(&solved, pc)
+
+					states := make(map[Board]int)
+					depth, found := 0, 0
+					explore_from_solved(&states, &solved, &found, &depth)
+
+					can_scramble := 0
+					for _, b := range solved {
+						if can_move(&b, 0, 0, 1) || can_move(&b, 0, 0, 3) {
+							can_scramble++
+						}
+					}
+
+					var furthest []Board
+					for k, v := range states {
+						if v == depth {
+							furthest = append(furthest, k)
+						}
+					}
+
+					sym_b := 0
+					for _, b := range furthest {
+						if b == transpose(&b) {
+							sym_b++
+						}
+					}
+
+					fmt.Printf("# %dx%d with %d pieces (R:%d, G:%d, B:%d) (solved:%d, scrambleable:%d, found:%d) has %d (symmetric:%d) furthest requiring %d moves\n",
+						4, 4, tpc + 1, pc[1], pc[3], pc[2],
+						len(solved), can_scramble, found, len(furthest), sym_b, depth)
+				}
+			}
+		}
+	}
 }
