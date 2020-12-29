@@ -292,6 +292,58 @@ func print_solution_steps(states *map[Board]int, d int) error {
 }
 
 
+func enumerate_solved(solved *[]Board, pc [3]int) {
+
+	*solved = make([]Board, 0) // "empty" the solved states list
+
+	b := new_board()
+	set_val(&b, 0, 0, 4) // Put the yellow piece in the solved position
+	rec_enum(solved, &b, pc, 1)
+}
+
+
+func rec_enum(solved *[]Board, b *Board, pc [3]int, o int) {
+
+	cx, cy := o % BOARD_WIDTH, o / BOARD_WIDTH
+
+	//fmt.Printf("rec_enum at %d, %d\n", cx, cy);
+
+	if cy >= BOARD_HEIGHT {
+		left := false
+		for i := 0; i < 3; i++ {
+			if pc[i] > 0 {
+				left = true
+				break
+			}
+		}
+
+		if !left {
+			*solved = append(*solved, *b)
+			//fmt.Printf("Adding board\n")
+		}
+
+		return
+	}
+
+	for i := 0; i < 3; i++ {
+		if pc[i] > 0 {
+			if will_fit(b, cx, cy, uint8(i + 1)) { // i + 1 skips the blank with the value 0
+				nb := copy_board(b)
+				npc := pc
+
+				set_val(&nb, cx, cy, uint8(i + 1))
+
+				npc[i]--
+
+				rec_enum(solved, &nb, npc, o + 1)
+			}
+		}
+	}
+	// Now just leave this spot blank and move on
+	rec_enum(solved, b, pc, o + 1)
+}
+
+
 
 func main() {
 
@@ -302,18 +354,24 @@ func main() {
 
 	//fmt.Printf("Board b:\n%s", board_to_string(&b))
 
-	states := make(map[Board]int)
-	d := find_solution(&states, &b)
+	pc := [3]int{6, 0, 0}
+	var solved []Board
+	enumerate_solved(&solved, pc)
 
-	if d > 0 {
-		fmt.Printf("Found solution in %d moves!\n", d)
-	} else {
-		fmt.Printf("Failed to find a solution!\n")
-	}
+	fmt.Printf("Found %d solved states.\n", len(solved))
 
-	err := print_solution_steps(&states, d)
+	// states := make(map[Board]int)
+	// d := find_solution(&states, &b)
 
-	if err != nil {
-		fmt.Printf(err.Error())
-	}
+	// if d > 0 {
+	// 	fmt.Printf("Found solution in %d moves!\n", d)
+	// } else {
+	// 	fmt.Printf("Failed to find a solution!\n")
+	// }
+
+	// err := print_solution_steps(&states, d)
+
+	// if err != nil {
+	// 	fmt.Printf(err.Error())
+	// }
 }
