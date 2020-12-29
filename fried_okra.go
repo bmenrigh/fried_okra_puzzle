@@ -163,6 +163,73 @@ func move(b *Board, x int, y int, d int) {
 }
 
 
+func explore_from_solved(states *map[Board]int, solved *[]Board, found *int, depth *int) {
+
+	*states = make(map[Board]int) // "empty" the states map
+
+	for _, b := range *solved {
+		(*states)[b] = 0
+	}
+
+	*found = 0
+	d := 0
+	for {
+		f := 0
+
+		var layerd []Board
+		for k, v := range *states {
+			if v == d {
+				layerd = append(layerd, k)
+			}
+		}
+
+		for _, cb := range layerd {
+			for x := 0; x < BOARD_WIDTH; x++ {
+				if d == 0 && x != 0 {
+					continue
+				}
+
+				for y := 0; y < BOARD_HEIGHT; y++ {
+					if d == 0 && y != 0 {
+						continue
+					}
+
+					for dir := 0; dir < 4; dir++ {
+						if d == 0 && dir != 1 && dir != 3 { // down and right
+							continue
+						}
+
+						if can_move(&cb, x, y, dir) {
+							nb := copy_board(&cb)
+
+							move(&nb, x, y, dir)
+
+							_, ok := (*states)[nb]
+
+							if !ok {
+								(*states)[nb] = d + 1
+								f++
+							}
+						}
+					}
+				}
+			}
+		}
+
+		if f > 0 {
+			d++
+
+			*found += f
+		} else {
+			//fmt.Printf("Got to depth %d without a solution!\n", d)
+			*depth = d
+			return
+		}
+
+	}
+}
+
+
 func find_solution(states *map[Board]int, b *Board) int {
 
 	*states = make(map[Board]int) // "empty" the states map
@@ -354,13 +421,19 @@ func main() {
 
 	//fmt.Printf("Board b:\n%s", board_to_string(&b))
 
-	pc := [3]int{6, 0, 0}
+	pc := [3]int{4, 0, 0}
 	var solved []Board
 	enumerate_solved(&solved, pc)
 
 	fmt.Printf("Found %d solved states.\n", len(solved))
 
-	// states := make(map[Board]int)
+	states := make(map[Board]int)
+
+	depth, found := 0, 0
+	explore_from_solved(&states, &solved, &found, &depth)
+
+	fmt.Printf("Found %d total states to a depth of %d.\n", found, depth)
+
 	// d := find_solution(&states, &b)
 
 	// if d > 0 {
