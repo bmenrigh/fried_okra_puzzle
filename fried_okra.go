@@ -359,7 +359,7 @@ func print_solution_steps(states *map[Board]int, d int) error {
 }
 
 
-func enumerate_solved(solved *[]Board, pc [3]int) {
+func enumerate_solved(solved *[]Board, pc [4]int) {
 
 	*solved = make([]Board, 0) // "empty" the solved states list
 
@@ -369,45 +369,37 @@ func enumerate_solved(solved *[]Board, pc [3]int) {
 }
 
 
-func rec_enum(solved *[]Board, b *Board, pc [3]int, o int) {
+func rec_enum(solved *[]Board, b *Board, pc [4]int, o int) {
 
 	cx, cy := o % BOARD_WIDTH, o / BOARD_WIDTH
 
 	//fmt.Printf("rec_enum at %d, %d\n", cx, cy);
 
 	if cy >= BOARD_HEIGHT {
-		left := false
-		for i := 0; i < 3; i++ {
-			if pc[i] > 0 {
-				left = true
-				break
-			}
-		}
 
-		if !left {
-			*solved = append(*solved, *b)
-			//fmt.Printf("Adding board\n")
-		}
+		*solved = append(*solved, *b)
+		//fmt.Printf("Adding board\n")
 
 		return
 	}
 
-	for i := 0; i < 3; i++ {
+	for i := 0; i < 4; i++ {
 		if pc[i] > 0 {
-			if will_fit(b, cx, cy, uint8(i + 1)) { // i + 1 skips the blank with the value 0
+			npc := pc
+			npc[i]--
+
+			if i == 0 {
+				// Now just leave this spot blank and move on
+				rec_enum(solved, b, npc, o + 1)
+			} else if will_fit(b, cx, cy, uint8(i)) {
 				nb := copy_board(b)
-				npc := pc
-
-				set_val(&nb, cx, cy, uint8(i + 1))
-
-				npc[i]--
+				set_val(&nb, cx, cy, uint8(i))
 
 				rec_enum(solved, &nb, npc, o + 1)
 			}
 		}
 	}
-	// Now just leave this spot blank and move on
-	rec_enum(solved, b, pc, o + 1)
+
 }
 
 
@@ -421,7 +413,7 @@ func main() {
 
 	//fmt.Printf("Board b:\n%s", board_to_string(&b))
 
-	pc := [3]int{4, 0, 0}
+	pc := [4]int{11, 4, 0, 0}
 	var solved []Board
 	enumerate_solved(&solved, pc)
 
