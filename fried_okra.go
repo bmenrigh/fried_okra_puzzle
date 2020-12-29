@@ -8,9 +8,11 @@ import (
 
 var (
 	val_string = [...]string {".", "R", "B", "G", "Y"}
+	val_name = [...]string {"!!BLANK!!", "Red", "Blue", "Green", "Yellow"}
 	val_dia = [...]uint8 {0, 1, 2, 3, 3}
 	dir_dx = [...]int {0, 0, -1, 1} // Up, down, left, right
 	dir_dy = [...]int {-1, 1, 0, 0} // Up, down, left, right
+	dir_opp_str = [...]string {"down", "up", "right", "left"}
 )
 
 const (
@@ -161,16 +163,16 @@ func move(b *Board, x int, y int, d int) {
 }
 
 
-func find_solution(b *Board) int {
+func find_solution(states *map[Board]int, b *Board) int {
 
-	states := make(map[Board]int)
+	*states = make(map[Board]int) // "empty" the states map
 
-	states[*b] = 0
+	(*states)[*b] = 0
 	d := 0
 	f := 0
 	for {
 		var layerd []Board
-		for k, v := range states {
+		for k, v := range *states {
 			if v == d {
 				layerd = append(layerd, k)
 			}
@@ -185,14 +187,14 @@ func find_solution(b *Board) int {
 
 							move(&nb, x, y, dir)
 
-							_, ok := states[nb]
+							_, ok := (*states)[nb]
 
 							if !ok {
-								states[nb] = d + 1
+								(*states)[nb] = d + 1
 								f++
 
 								if get_val(&nb, 0, 0) == 4 {
-									fmt.Printf("Found solution in %d moves!\n", d + 1)
+									//fmt.Printf("Found solution in %d moves!\n", d + 1)
 									return d + 1
 								}
 							}
@@ -205,13 +207,90 @@ func find_solution(b *Board) int {
 		if f > 0 {
 			d++
 		} else {
-			fmt.Printf("Got to depth %d without a solution!\n", d)
+			//fmt.Printf("Got to depth %d without a solution!\n", d)
 			return -1
 		}
 
 	}
-
 }
+
+
+func print_solution_steps(states *map[Board]int, d int) error {
+
+	if d <= 0 {
+		return errors.New("Depth must be positive!")
+	}
+
+	boards := make([]Board, 0, d + 1)
+	steps := make([]string, 0, d + 1)
+
+	var b Board
+	f := false
+	for k, v := range *states {
+		if v == d {
+			if get_val(&k, 0, 0) == 4 {
+				b = k
+				f = true
+				break
+			}
+		}
+	}
+
+	if !f {
+		return errors.New("Could not find solution board at specified depth")
+	}
+
+	boards = append(boards, b)
+	for d > 0 {
+		for x := 0; x < BOARD_WIDTH; x++ {
+			for y := 0; y < BOARD_HEIGHT; y++ {
+				for dir := 0; dir < 4; dir++ {
+					if can_move(&b, x, y, dir) {
+						nb := copy_board(&b)
+						move(&nb, x, y, dir)
+
+						nd, ok := (*states)[nb]
+
+						if !ok {
+							continue
+						}
+
+						if nd >= d {
+							continue
+						}
+
+						nx, ny, err := find_move_target(&b, x, y, dir)
+
+						if err != nil {
+							return err
+						}
+
+						v := get_val(&b, x, y)
+
+						step := fmt.Sprintf("Step %d: Move %s at (%d,%d) %s to (%d,%d)",
+							d, val_name[v], nx + 1, ny + 1, dir_opp_str[dir], x + 1, y + 1)
+
+						steps = append(steps, step)
+						boards = append(boards, nb)
+						b = nb
+						d = nd
+					}
+
+				}
+			}
+		}
+	}
+
+	steps = append(steps, "Step 0: Start with this board")
+
+	for i := len(boards) - 1; i >= 0; i-- {
+		fmt.Println(steps[i])
+		fmt.Println(board_to_string(&(boards[i])))
+	}
+
+	return nil
+}
+
 
 
 func main() {
@@ -221,7 +300,20 @@ func main() {
 	// 90 moves
 	b.Grid = [16]uint8{2, 2, 2, 1, 1, 0, 0, 0, 1, 0, 0, 2, 1, 4, 0, 0}
 
-	fmt.Printf("Board b:\n%s", board_to_string(&b))
+	//fmt.Printf("Board b:\n%s", board_to_string(&b))
 
-	find_solution(&b)
+	states := make(map[Board]int)
+	d := find_solution(&states, &b)
+
+	if d > 0 {
+		fmt.Printf("Found solution in %d moves!\n", d)
+	} else {
+		fmt.Printf("Failed to find a solution!\n")
+	}
+
+	err := print_solution_steps(&states, d)
+
+	if err != nil {
+		fmt.Printf(err.Error())
+	}
 }
