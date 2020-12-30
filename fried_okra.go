@@ -81,6 +81,26 @@ func transpose(b *Board) Board {
 }
 
 
+func is_symmetric(b *Board) bool {
+
+	for y := 0; y < BOARD_HEIGHT; y++ {
+		for x := y + 1; x < BOARD_WIDTH; x++ {
+			if get_val(b, x, y) != get_val(b, y, x) {
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
+
+func is_solved(b *Board) bool {
+
+	return get_val(b, 0, 0) == 4
+}
+
+
 func will_fit(b *Board, x int, y int, v uint8) bool {
 
 	if get_val(b, x, y) != 0 {
@@ -177,11 +197,15 @@ func move(b *Board, x int, y int, d int) {
 }
 
 
-func explore_from_solved(states *map[Board]int, solved *[]Board, found *int, depth *int) {
+func explore_from_board_list(states *map[Board]int, blist *[]Board, found *int, depth *int, stop_at_solved bool) {
 
 	*states = make(map[Board]int) // "empty" the states map
 
-	for _, b := range *solved {
+	for _, b := range *blist {
+		if stop_at_solved && is_solved(&b) {
+			continue
+		}
+
 		(*states)[b] = 0
 	}
 
@@ -199,19 +223,8 @@ func explore_from_solved(states *map[Board]int, solved *[]Board, found *int, dep
 
 		for _, cb := range layerd {
 			for x := 0; x < BOARD_WIDTH; x++ {
-				if d == 0 && x != 0 {
-					continue
-				}
-
 				for y := 0; y < BOARD_HEIGHT; y++ {
-					if d == 0 && y != 0 {
-						continue
-					}
-
 					for dir := 0; dir < 4; dir++ {
-						if d == 0 && dir != 1 && dir != 3 { // down and right
-							continue
-						}
 
 						if can_move(&cb, x, y, dir) {
 							nb := copy_board(&cb)
@@ -221,6 +234,10 @@ func explore_from_solved(states *map[Board]int, solved *[]Board, found *int, dep
 							_, ok := (*states)[nb]
 
 							if !ok {
+								if stop_at_solved && is_solved(&nb) {
+									continue
+								}
+
 								(*states)[nb] = d + 1
 								f++
 							}
@@ -274,7 +291,7 @@ func find_solution(states *map[Board]int, b *Board) int {
 								(*states)[nb] = d + 1
 								f++
 
-								if get_val(&nb, 0, 0) == 4 {
+								if is_solved(&nb) {
 									//fmt.Printf("Found solution in %d moves!\n", d + 1)
 									return d + 1
 								}
@@ -307,13 +324,11 @@ func print_solution_steps(states *map[Board]int, d int) error {
 
 	var b Board
 	f := false
-	for k, v := range *states {
-		if v == d {
-			if get_val(&k, 0, 0) == 4 {
-				b = k
-				f = true
-				break
-			}
+	for cb, cd := range *states {
+		if cd == d && is_solved(&cb) {
+			b = cb
+			f = true
+			break
 		}
 	}
 
@@ -495,10 +510,6 @@ func main() {
 					var solved []Board
 					enumerate_solved(&solved, pc)
 
-					states := make(map[Board]int)
-					depth, found := 0, 0
-					explore_from_solved(&states, &solved, &found, &depth)
-
 					can_scramble := 0
 					for _, b := range solved {
 						if can_move(&b, 0, 0, 1) || can_move(&b, 0, 0, 3) {
@@ -506,8 +517,12 @@ func main() {
 						}
 					}
 
+					all_states := make(map[Board]int)
+					depth, found := 0, 0
+					explore_from_board_list(&all_states, &solved, &found, &depth, false)
+
 					var furthest []Board
-					for k, v := range states {
+					for k, v := range all_states {
 						if v == depth {
 							furthest = append(furthest, k)
 						}
@@ -517,9 +532,185 @@ func main() {
 						return board_less(&furthest[i], &furthest[j])
 					})
 
+					// Now we'll re-explore all the states until all
+					// of them have been found; counting how many
+					// disjoint sets there are
+					all_found_nostart := make(map[Board]bool)
+					disjoint_sets_nostart := 0
+					symmetry_free_sets_nostart := 0
+					largest_set_nostart := 0
+					disjoint_furthest_nostart := make([]Board, 0)
+					// First from each furthest state
+					for _, b := range furthest {
+						_, ok := all_found_nostart[b]
+
+						if !ok {
+							disjoint_sets_nostart++
+
+							// Track this as an example state for this set
+							disjoint_furthest_nostart = append(disjoint_furthest_nostart, b)
+
+							set_states := make(map[Board]int)
+							start_state := make([]Board, 0, 1)
+							start_state = append(start_state, b)
+							set_size := 0
+							set_depth := 0
+							explore_from_board_list(&set_states, &start_state, &set_size, &set_depth, true)
+
+							if set_size > largest_set_nostart {
+								largest_set_nostart = set_size
+							}
+
+							// Check if this set was symmetry-free by seeing if
+							// the start-state's transpose is in the set
+							tss := transpose(&b)
+							_, ok := set_states[tss]
+
+							if !ok {
+								symmetry_free_sets_nostart++
+							}
+
+							// Put each of these found states in the found map
+							for cb, _ := range set_states {
+								all_found_nostart[cb] = true
+							}
+						}
+					}
+					// Record the stats now that we've searched all the furthest
+					disjoint_furthest_sets_nostart := disjoint_sets_nostart;
+					symmetry_free_furthest_sets_nostart := symmetry_free_sets_nostart
+					furthest_largest_set_nostart := largest_set_nostart
+
+					// Continue search
+					for b, _ := range all_states {
+
+						if is_solved(&b) {
+							continue
+						}
+
+						_, ok := all_found_nostart[b]
+
+						if !ok {
+							disjoint_sets_nostart++
+
+							set_states := make(map[Board]int)
+							start_state := make([]Board, 0, 1)
+							start_state = append(start_state, b)
+							set_size := 0
+							set_depth := 0
+							explore_from_board_list(&set_states, &start_state, &set_size, &set_depth, true)
+
+							if set_size > largest_set_nostart {
+								largest_set_nostart = set_size
+							}
+
+							// Check if this set was symmetry-free by seeing if
+							// the start-state's transpose is in the set
+							tss := transpose(&b)
+							_, ok := set_states[tss]
+
+							if !ok {
+								symmetry_free_sets_nostart++
+							}
+
+							// Put each of these found states in the found map
+							for cb, _ := range set_states {
+								all_found_nostart[cb] = true
+							}
+						}
+					}
+
+
+					// Now do the exploration again but pass through the start states
+					all_found_wstart := make(map[Board]bool)
+					disjoint_sets_wstart := 0
+					symmetry_free_sets_wstart := 0
+					largest_set_wstart := 0
+					disjoint_furthest_wstart := make([]Board, 0)
+					// First from each furthest state
+					for _, b := range furthest {
+						_, ok := all_found_wstart[b]
+
+						if !ok {
+							disjoint_sets_wstart++
+
+							// Track this as an example state for this set
+							disjoint_furthest_wstart = append(disjoint_furthest_wstart, b)
+
+							set_states := make(map[Board]int)
+							start_state := make([]Board, 0, 1)
+							start_state = append(start_state, b)
+							set_size := 0
+							set_depth := 0
+							explore_from_board_list(&set_states, &start_state, &set_size, &set_depth, false)
+
+							if set_size > largest_set_wstart {
+								largest_set_wstart = set_size
+							}
+
+							// Check if this set was symmetry-free by seeing if
+							// the start-state's transpose is in the set
+							tss := transpose(&b)
+							_, ok := set_states[tss]
+
+							if !ok {
+								symmetry_free_sets_wstart++
+							}
+
+							// Put each of these found states in the found map
+							for cb, _ := range set_states {
+								all_found_wstart[cb] = true
+							}
+						}
+					}
+					// Record the stats now that we've searched all the furthest
+					disjoint_furthest_sets_wstart := disjoint_sets_wstart;
+					symmetry_free_furthest_sets_wstart := symmetry_free_sets_wstart
+					furthest_largest_set_wstart := largest_set_wstart
+
+					// Continue search
+					for b, _ := range all_states {
+
+						if is_solved(&b) {
+							continue
+						}
+
+						_, ok := all_found_wstart[b]
+
+						if !ok {
+							disjoint_sets_wstart++
+
+							set_states := make(map[Board]int)
+							start_state := make([]Board, 0, 1)
+							start_state = append(start_state, b)
+							set_size := 0
+							set_depth := 0
+							explore_from_board_list(&set_states, &start_state, &set_size, &set_depth, false)
+
+							if set_size > largest_set_wstart {
+								largest_set_wstart = set_size
+							}
+
+							// Check if this set was symmetry-free by seeing if
+							// the start-state's transpose is in the set
+							tss := transpose(&b)
+							_, ok := set_states[tss]
+
+							if !ok {
+								symmetry_free_sets_wstart++
+							}
+
+							// Put each of these found states in the found map
+							for cb, _ := range set_states {
+								all_found_wstart[cb] = true
+							}
+						}
+					}
+
+
 					sym_b := 0
 					for _, b := range furthest {
-						if b == transpose(&b) {
+						if is_symmetric(&b) {
 							sym_b++
 						}
 					}
@@ -527,9 +718,25 @@ func main() {
 					fmt.Printf("# %dx%d with %d pieces (R:%d, G:%d, B:%d) (solved:%d, scrambleable:%d, found:%d) has %d (symmetric:%d) furthest requiring %d moves\n",
 						4, 4, tpc + 1, pc[1], pc[3], pc[2],
 						len(solved), can_scramble, found, len(furthest), sym_b, depth)
-					if depth > 0 && len(furthest) > 0 {
-						fmt.Println("====== Example Furthest Scramble =====");
-						fmt.Println(board_to_string(&furthest[0]))
+					if depth > 0 {
+
+						fmt.Printf("The %d furthest states come in %d disjoint set(s) (symmetryfree:%d, largest:%d) out of %d set(s) (symmetryfree:%d, largest:%d) when exploration is stopped at a solved state\n",
+							len(furthest), disjoint_furthest_sets_nostart, symmetry_free_furthest_sets_nostart, furthest_largest_set_nostart,
+							disjoint_sets_nostart, symmetry_free_sets_nostart, largest_set_nostart)
+
+						for n, cb := range disjoint_furthest_nostart {
+							fmt.Printf("====== Set %d Example Furthest State (stopped at solved) =====\n", n + 1);
+							fmt.Println(board_to_string(&cb))
+						}
+
+						fmt.Printf("The %d furthest states come in %d disjoint set(s) (symmetryfree:%d, largest:%d) out of %d set(s) (symmetryfree:%d, largest:%d) when exploration continues through solved states\n",
+							len(furthest), disjoint_furthest_sets_wstart, symmetry_free_furthest_sets_wstart, furthest_largest_set_wstart,
+							disjoint_sets_wstart, symmetry_free_sets_wstart, largest_set_wstart)
+
+						for n, cb := range disjoint_furthest_wstart {
+							fmt.Printf("====== Set %d Example Furthest State (continued through solved) =====\n", n + 1);
+							fmt.Println(board_to_string(&cb))
+						}
 					}
 				}
 			}
