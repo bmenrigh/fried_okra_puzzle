@@ -557,6 +557,9 @@ func main() {
 							set_depth := 0
 							explore_from_board_list(&set_states, &start_state, &set_size, &set_depth, true)
 
+							// Account for the one starting state (which isn't 'found')
+							set_size++;
+
 							if set_size > largest_set_nostart {
 								largest_set_nostart = set_size
 							}
@@ -599,6 +602,9 @@ func main() {
 							set_size := 0
 							set_depth := 0
 							explore_from_board_list(&set_states, &start_state, &set_size, &set_depth, true)
+
+							// Account for the one starting state (which isn't 'found')
+							set_size++;
 
 							if set_size > largest_set_nostart {
 								largest_set_nostart = set_size
@@ -644,6 +650,9 @@ func main() {
 							set_depth := 0
 							explore_from_board_list(&set_states, &start_state, &set_size, &set_depth, false)
 
+							// Account for the one starting state (which isn't 'found')
+							set_size++;
+
 							if set_size > largest_set_wstart {
 								largest_set_wstart = set_size
 							}
@@ -686,6 +695,9 @@ func main() {
 							set_size := 0
 							set_depth := 0
 							explore_from_board_list(&set_states, &start_state, &set_size, &set_depth, false)
+
+							// Account for the one starting state (which isn't 'found')
+							set_size++;
 
 							if set_size > largest_set_wstart {
 								largest_set_wstart = set_size
