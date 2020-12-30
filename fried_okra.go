@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"errors"
 	"os"
+	"sort"
 )
 
 var (
@@ -416,13 +417,35 @@ func rec_enum(solved *[]Board, b *Board, pc [4]int, o int) {
 }
 
 
+func board_less(b1, b2 *Board) bool {
+
+	for i := 0; i < (BOARD_HEIGHT * BOARD_WIDTH); i++ {
+		if ((*b1).Grid[i] < (*b2).Grid[i]) {
+			return true
+		} else if ((*b1).Grid[i] > (*b2).Grid[i]) {
+			return false
+		}
+	}
+
+	return false
+}
+
+
 
 func main() {
 
 	//b := new_board()
 
 	// 90 moves
-	//b.Grid = [16]uint8{2, 2, 2, 1, 1, 0, 0, 0, 1, 0, 0, 2, 1, 4, 0, 0}
+	// b.Grid = [16]uint8{2, 2, 2, 1, 1, 0, 0, 0, 1, 0, 0, 2, 1, 4, 0, 0}
+
+	// bt := transpose(&b)
+
+	// if board_less(&bt, &b) {
+	// 	fmt.Printf("Board bt is less than b:\n%s", board_to_string(&bt))
+	// } else {
+	// 	fmt.Printf("Board b is greater or equal to bt:\n%s", board_to_string(&b))
+	// }
 
 	//fmt.Printf("Board b:\n%s", board_to_string(&b))
 
@@ -490,6 +513,10 @@ func main() {
 						}
 					}
 
+					sort.Slice(furthest, func(i, j int) bool {
+						return board_less(&furthest[i], &furthest[j])
+					})
+
 					sym_b := 0
 					for _, b := range furthest {
 						if b == transpose(&b) {
@@ -500,6 +527,10 @@ func main() {
 					fmt.Printf("# %dx%d with %d pieces (R:%d, G:%d, B:%d) (solved:%d, scrambleable:%d, found:%d) has %d (symmetric:%d) furthest requiring %d moves\n",
 						4, 4, tpc + 1, pc[1], pc[3], pc[2],
 						len(solved), can_scramble, found, len(furthest), sym_b, depth)
+					if depth > 0 && len(furthest) > 0 {
+						fmt.Println("====== Example Furthest Scramble =====");
+						fmt.Println(board_to_string(&furthest[0]))
+					}
 				}
 			}
 		}
