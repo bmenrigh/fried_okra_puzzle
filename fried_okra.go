@@ -197,7 +197,7 @@ func move(b *Board, x int, y int, d int) {
 }
 
 
-func explore_from_board_list(states *map[Board]int, blist *[]Board, found *int, depth *int, stop_at_solved bool) {
+func explore_from_board_list(states *map[Board]int, blist *[]Board, found *int, depth *int, found_solved *int, stop_at_solved bool) {
 
 	*states = make(map[Board]int) // "empty" the states map
 
@@ -234,8 +234,12 @@ func explore_from_board_list(states *map[Board]int, blist *[]Board, found *int, 
 							_, ok := (*states)[nb]
 
 							if !ok {
-								if stop_at_solved && is_solved(&nb) {
-									continue
+								if is_solved(&nb) {
+									*found_solved += 1
+
+									if stop_at_solved {
+										continue
+									}
 								}
 
 								(*states)[nb] = d + 1
@@ -518,8 +522,8 @@ func main() {
 					}
 
 					all_states := make(map[Board]int)
-					depth, found := 0, 0
-					explore_from_board_list(&all_states, &solved, &found, &depth, false)
+					depth, found, found_solved := 0, 0, 0
+					explore_from_board_list(&all_states, &solved, &found, &depth, &found_solved, false)
 
 					var furthest []Board
 					for k, v := range all_states {
@@ -539,6 +543,7 @@ func main() {
 					disjoint_sets_nostart := 0
 					symmetry_free_sets_nostart := 0
 					largest_set_nostart := 0
+					largest_set_solved_nostart := 0
 					disjoint_furthest_nostart := make([]Board, 0)
 					// First from each furthest state
 					for _, b := range furthest {
@@ -555,13 +560,15 @@ func main() {
 							start_state = append(start_state, b)
 							set_size := 0
 							set_depth := 0
-							explore_from_board_list(&set_states, &start_state, &set_size, &set_depth, true)
+							set_solved := 0
+							explore_from_board_list(&set_states, &start_state, &set_size, &set_depth, &set_solved, true)
 
 							// Account for the one starting state (which isn't 'found')
 							set_size++;
 
 							if set_size > largest_set_nostart {
 								largest_set_nostart = set_size
+								largest_set_solved_nostart = set_solved
 							}
 
 							// Check if this set was symmetry-free by seeing if
@@ -583,6 +590,7 @@ func main() {
 					disjoint_furthest_sets_nostart := disjoint_sets_nostart;
 					symmetry_free_furthest_sets_nostart := symmetry_free_sets_nostart
 					furthest_largest_set_nostart := largest_set_nostart
+					furthest_largest_set_solved_nostart := largest_set_solved_nostart
 
 					// Continue search
 					for b, _ := range all_states {
@@ -601,13 +609,15 @@ func main() {
 							start_state = append(start_state, b)
 							set_size := 0
 							set_depth := 0
-							explore_from_board_list(&set_states, &start_state, &set_size, &set_depth, true)
+							set_solved := 0
+							explore_from_board_list(&set_states, &start_state, &set_size, &set_depth, &set_solved, true)
 
 							// Account for the one starting state (which isn't 'found')
 							set_size++;
 
 							if set_size > largest_set_nostart {
 								largest_set_nostart = set_size
+								largest_set_solved_nostart = set_solved
 							}
 
 							// Check if this set was symmetry-free by seeing if
@@ -632,6 +642,7 @@ func main() {
 					disjoint_sets_wstart := 0
 					symmetry_free_sets_wstart := 0
 					largest_set_wstart := 0
+					largest_set_solved_wstart := 0
 					disjoint_furthest_wstart := make([]Board, 0)
 					// First from each furthest state
 					for _, b := range furthest {
@@ -648,13 +659,15 @@ func main() {
 							start_state = append(start_state, b)
 							set_size := 0
 							set_depth := 0
-							explore_from_board_list(&set_states, &start_state, &set_size, &set_depth, false)
+							set_solved := 0
+							explore_from_board_list(&set_states, &start_state, &set_size, &set_depth, &set_solved, false)
 
 							// Account for the one starting state (which isn't 'found')
 							set_size++;
 
 							if set_size > largest_set_wstart {
 								largest_set_wstart = set_size
+								largest_set_solved_wstart = set_solved
 							}
 
 							// Check if this set was symmetry-free by seeing if
@@ -676,6 +689,7 @@ func main() {
 					disjoint_furthest_sets_wstart := disjoint_sets_wstart;
 					symmetry_free_furthest_sets_wstart := symmetry_free_sets_wstart
 					furthest_largest_set_wstart := largest_set_wstart
+					furthest_largest_set_solved_wstart := largest_set_solved_wstart
 
 					// Continue search
 					for b, _ := range all_states {
@@ -694,13 +708,15 @@ func main() {
 							start_state = append(start_state, b)
 							set_size := 0
 							set_depth := 0
-							explore_from_board_list(&set_states, &start_state, &set_size, &set_depth, false)
+							set_solved := 0
+							explore_from_board_list(&set_states, &start_state, &set_size, &set_depth, &set_solved, false)
 
 							// Account for the one starting state (which isn't 'found')
 							set_size++;
 
 							if set_size > largest_set_wstart {
 								largest_set_wstart = set_size
+								largest_set_solved_wstart = set_solved
 							}
 
 							// Check if this set was symmetry-free by seeing if
@@ -732,18 +748,26 @@ func main() {
 						len(solved), can_scramble, found, len(furthest), sym_b, depth)
 					if depth > 0 {
 
-						fmt.Printf("The %d furthest states come in %d disjoint set(s) (symmetryfree:%d, largest:%d) out of %d set(s) (symmetryfree:%d, largest:%d) when exploration is stopped at a solved state\n",
-							len(furthest), disjoint_furthest_sets_nostart, symmetry_free_furthest_sets_nostart, furthest_largest_set_nostart,
-							disjoint_sets_nostart, symmetry_free_sets_nostart, largest_set_nostart)
+						fmt.Printf("csv,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
+							4, 4, tpc + 1, pc[1], pc[3], pc[2],
+							len(solved), can_scramble, found, len(furthest), sym_b, depth,
+							disjoint_furthest_sets_nostart, symmetry_free_furthest_sets_nostart, furthest_largest_set_nostart + furthest_largest_set_solved_nostart, furthest_largest_set_solved_nostart,
+							disjoint_sets_nostart, symmetry_free_sets_nostart, largest_set_nostart + largest_set_solved_nostart, largest_set_solved_nostart,
+							disjoint_furthest_sets_wstart, symmetry_free_furthest_sets_wstart, furthest_largest_set_wstart + furthest_largest_set_solved_wstart, furthest_largest_set_solved_wstart,
+							disjoint_sets_wstart, symmetry_free_sets_wstart, largest_set_wstart, largest_set_solved_wstart)
+
+						fmt.Printf("The %d furthest states come in %d disjoint set(s) (symmetryfree:%d, largest:%d, solved:%d) out of %d set(s) (symmetryfree:%d, largest:%d, solved:%d) when exploration is stopped at a solved state\n",
+							len(furthest), disjoint_furthest_sets_nostart, symmetry_free_furthest_sets_nostart, furthest_largest_set_nostart + furthest_largest_set_solved_nostart, furthest_largest_set_solved_nostart,
+							disjoint_sets_nostart, symmetry_free_sets_nostart, largest_set_nostart + largest_set_solved_nostart, largest_set_solved_nostart)
 
 						for n, cb := range disjoint_furthest_nostart {
 							fmt.Printf("====== Set %d Example Furthest State (stopped at solved) =====\n", n + 1);
 							fmt.Println(board_to_string(&cb))
 						}
 
-						fmt.Printf("The %d furthest states come in %d disjoint set(s) (symmetryfree:%d, largest:%d) out of %d set(s) (symmetryfree:%d, largest:%d) when exploration continues through solved states\n",
-							len(furthest), disjoint_furthest_sets_wstart, symmetry_free_furthest_sets_wstart, furthest_largest_set_wstart,
-							disjoint_sets_wstart, symmetry_free_sets_wstart, largest_set_wstart)
+						fmt.Printf("The %d furthest states come in %d disjoint set(s) (symmetryfree:%d, largest:%d, solved:%d) out of %d set(s) (symmetryfree:%d, largest:%d, solved:%d) when exploration continues through solved states\n",
+							len(furthest), disjoint_furthest_sets_wstart, symmetry_free_furthest_sets_wstart, furthest_largest_set_wstart + furthest_largest_set_solved_wstart, furthest_largest_set_solved_wstart,
+							disjoint_sets_wstart, symmetry_free_sets_wstart, largest_set_wstart, largest_set_solved_wstart)
 
 						for n, cb := range disjoint_furthest_wstart {
 							fmt.Printf("====== Set %d Example Furthest State (continued through solved) =====\n", n + 1);
